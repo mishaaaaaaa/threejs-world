@@ -1,14 +1,13 @@
 import * as THREE from "three";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
-import { Octree } from "three/examples/jsm/math/Octree.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+
 let camera, scene, renderer, controls, position;
 
 const objects = [];
+let loader;
 
 let raycaster;
-let forwardRaycaster;
-let xRaycater;
-let mouseRaycaster;
 
 let moveForward = false;
 let moveBackward = false;
@@ -31,12 +30,6 @@ function init() {
     1000
   );
   camera.position.set(0, 10, -100);
-
-  // const container = document.getElementById("blocker");
-
-  // container.addEventListener("pointermove", onPointerMove);
-  // const localRaycaster = new THREE.Raycaster();
-  // const pointer = new THREE.Vector2();
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
@@ -145,29 +138,47 @@ function init() {
   const boxMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
   const box = new THREE.Mesh(boxGeometry, boxMaterial);
   box.position.set(0, 15, 0);
-  scene.add(box);
+  // scene.add(box);
   camera.lookAt(box.position);
 
-  objects.push(box);
+  // objects.push(box);
+
+  // home
+
+  loader = new GLTFLoader();
+
+  loader.load(
+    // resource URL
+    "assets/small_villa/scene.gltf",
+    // called when the resource is loaded
+    function (gltf) {
+      const model = gltf.scene;
+      model.scale.set(8, 8, 8);
+      model.position.set(
+        model.position.x,
+        model.position.y + 5,
+        model.position.z
+      );
+      scene.add(model);
+      objects.push();
+
+      gltf.animations; // Array<THREE.AnimationClip>
+      gltf.scene; // THREE.Group
+      gltf.scenes; // Array<THREE.Group>
+      gltf.cameras; // Array<THREE.Camera>
+      gltf.asset; // Object
+    },
+    // called while loading is progressing
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // called when loading has errors
+    function (error) {
+      console.log("An error happened");
+    }
+  );
 
   window.addEventListener("resize", onWindowResize);
-
-  // function onPointerMove(event) {
-  //   pointer.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
-  //   pointer.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-  //   localRaycaster.setFromCamera(pointer, camera);
-
-  //   // See if the ray from the camera into the world hits one of our meshes
-  //   const intersects = localRaycaster.intersectObject(objects);
-
-  //   // Toggle rotation bool for meshes that we clicked
-  //   if (intersects.length > 0) {
-  //     helper.position.set(0, 0, 0);
-  //     helper.lookAt(intersects[0].face.normal);
-
-  //     helper.position.copy(intersects[0].point);
-  //   }
-  // }
 }
 
 function onWindowResize() {
@@ -184,91 +195,77 @@ raycaster = new THREE.Raycaster(
   10
 );
 
-forwardRaycaster = new THREE.Raycaster(
-  new THREE.Vector3(),
-  new THREE.Vector3(0, 0, -1), // Изменен вектор направления для forwardRaycaster
-  2,
-  10
-);
-
-xRaycater = new THREE.Raycaster(
-  new THREE.Vector3(),
-  new THREE.Vector3(-1, 0, 0), // Изменен вектор направления для forwardRaycaster
-  2,
-  10
-);
-
-// mouseRaycaster = new THREE.Raycaster();
-// mouseRaycaster.setFromCamera(controls, camera);
-
 function animate() {
   requestAnimationFrame(animate);
 
+  if (!controls.isLocked) return;
+
   const time = performance.now();
+  const delta = (time - prevTime) / 1000;
 
-  if (controls.isLocked === true) {
-    raycaster.ray.origin.copy(controls.getObject().position);
-    raycaster.ray.origin.y -= 10;
+  const cameraPosition = controls.getObject().position;
+  raycaster.ray.origin.copy(cameraPosition).add(new THREE.Vector3(0, -10, 0));
 
-    const intersections = raycaster.intersectObjects(objects, false);
+  const intersections = raycaster.intersectObjects(objects);
+  const onObject = intersections.length > 0;
 
-    forwardRaycaster.ray.origin.copy(controls.getObject().position);
-    forwardRaycaster.ray.origin.z -= 10;
-    const forwardIntersections = forwardRaycaster.intersectObjects(
-      objects,
-      false
-    );
+  velocity.x -= velocity.x * 10.0 * delta;
+  velocity.z -= velocity.z * 10.0 * delta;
+  velocity.y -= 9.8 * 100.0 * delta;
 
-    // const mouseIntersects = mouseRaycaster.intersectObjects(objects);
-    //console.log(mouseIntersects);
+  direction.z = Number(moveForward) - Number(moveBackward);
+  direction.x = Number(moveRight) - Number(moveLeft);
+  direction.normalize();
 
-    xRaycater.ray.origin.copy(controls.getObject().position);
-    xRaycater.ray.origin.x -= 10;
-    const xIntersection = xRaycater.intersectObjects(objects, false);
+  if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+  if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
 
-    const onObject = intersections.length > 0;
-    const crossingObject =
-      forwardIntersections.length > 0 || xIntersection.length > 0;
+  if (onObject) {
+    velocity.y = Math.max(0, velocity.y);
+    canJump = true;
+  }
 
-    // console.log(forwardIntersections, xIntersection);
+  const collisionRange = 10;
+  const tempVelocity = velocity.clone().multiplyScalar(delta);
+  const nextPosition = cameraPosition.clone().add(tempVelocity);
 
-    const delta = (time - prevTime) / 1000;
+  let tooClose = false;
 
-    velocity.x -= velocity.x * 10.0 * delta;
-    velocity.z -= velocity.z * 10.0 * delta;
+  for (let i = 0; i < objects.length; i++) {
+    const object = objects[i];
+    const objectDirection = object.position
+      .clone()
+      .sub(nextPosition)
+      .normalize();
+    raycaster.set(nextPosition, objectDirection);
+    const directionIntersects = raycaster.intersectObject(object);
 
-    velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
-
-    if (onObject === true) {
-      velocity.y = Math.max(0, velocity.y);
-      canJump = true;
-    }
-    if (crossingObject) {
-      velocity.x = Math.max(0, velocity.x);
-      velocity.z = Math.max(0, velocity.z);
-    }
-
-    direction.z = Number(moveForward) - Number(moveBackward);
-    direction.x = Number(moveRight) - Number(moveLeft);
-    direction.normalize();
-
-    if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-    if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
-
-    controls.moveRight(-velocity.x * delta);
-    controls.moveForward(-velocity.z * delta);
-
-    controls.getObject().position.y += velocity.y * delta;
-
-    if (controls.getObject().position.y < 10) {
-      velocity.y = 0;
-      controls.getObject().position.y = 10; // camera position
-
-      canJump = true;
+    if (
+      directionIntersects.length > 0 &&
+      directionIntersects[0].distance < collisionRange
+    ) {
+      tooClose = true;
+      const collisionDirection = object.position
+        .clone()
+        .sub(cameraPosition)
+        .normalize();
+      cameraPosition.add(collisionDirection.multiplyScalar(-0.1));
+      break;
     }
   }
 
-  prevTime = time;
+  if (!tooClose) {
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
+    cameraPosition.y += velocity.y * delta;
+  }
 
+  if (cameraPosition.y < 10) {
+    velocity.y = 0;
+    cameraPosition.y = 10;
+    canJump = true;
+  }
+
+  prevTime = time;
   renderer.render(scene, camera);
 }
