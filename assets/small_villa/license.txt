@@ -1,0 +1,11 @@
+Model Information:
+* title:	Small Villa
+* source:	https://sketchfab.com/3d-models/small-villa-6fc3a756dacd40af8c6e4e3b8e674ea2
+* author:	RenderRite (https://sketchfab.com/RenderRite)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Small Villa" (https://sketchfab.com/3d-models/small-villa-6fc3a756dacd40af8c6e4e3b8e674ea2) by RenderRite (https://sketchfab.com/RenderRite) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

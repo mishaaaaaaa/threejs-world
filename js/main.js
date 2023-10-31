@@ -1,9 +1,11 @@
 import * as THREE from "three";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
-import { Octree } from "three/examples/jsm/math/Octree.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+
 let camera, scene, renderer, controls, position;
 
 const objects = [];
+let loader;
 
 let raycaster;
 
@@ -136,10 +138,45 @@ function init() {
   const boxMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
   const box = new THREE.Mesh(boxGeometry, boxMaterial);
   box.position.set(0, 15, 0);
-  scene.add(box);
+  // scene.add(box);
   camera.lookAt(box.position);
 
-  objects.push(box);
+  // objects.push(box);
+
+  // home
+
+  loader = new GLTFLoader();
+
+  loader.load(
+    // resource URL
+    "assets/small_villa/scene.gltf",
+    // called when the resource is loaded
+    function (gltf) {
+      const model = gltf.scene;
+      model.scale.set(8, 8, 8);
+      model.position.set(
+        model.position.x,
+        model.position.y + 5,
+        model.position.z
+      );
+      scene.add(model);
+      objects.push();
+
+      gltf.animations; // Array<THREE.AnimationClip>
+      gltf.scene; // THREE.Group
+      gltf.scenes; // Array<THREE.Group>
+      gltf.cameras; // Array<THREE.Camera>
+      gltf.asset; // Object
+    },
+    // called while loading is progressing
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // called when loading has errors
+    function (error) {
+      console.log("An error happened");
+    }
+  );
 
   window.addEventListener("resize", onWindowResize);
 }
