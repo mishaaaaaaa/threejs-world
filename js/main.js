@@ -6,9 +6,6 @@ let camera, scene, renderer, controls, position;
 const objects = [];
 
 let raycaster;
-let forwardRaycaster;
-let xRaycater;
-let mouseRaycaster;
 
 let moveForward = false;
 let moveBackward = false;
@@ -31,12 +28,6 @@ function init() {
     1000
   );
   camera.position.set(0, 10, -100);
-
-  // const container = document.getElementById("blocker");
-
-  // container.addEventListener("pointermove", onPointerMove);
-  // const localRaycaster = new THREE.Raycaster();
-  // const pointer = new THREE.Vector2();
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
@@ -151,23 +142,6 @@ function init() {
   objects.push(box);
 
   window.addEventListener("resize", onWindowResize);
-
-  // function onPointerMove(event) {
-  //   pointer.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
-  //   pointer.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-  //   localRaycaster.setFromCamera(pointer, camera);
-
-  //   // See if the ray from the camera into the world hits one of our meshes
-  //   const intersects = localRaycaster.intersectObject(objects);
-
-  //   // Toggle rotation bool for meshes that we clicked
-  //   if (intersects.length > 0) {
-  //     helper.position.set(0, 0, 0);
-  //     helper.lookAt(intersects[0].face.normal);
-
-  //     helper.position.copy(intersects[0].point);
-  //   }
-  // }
 }
 
 function onWindowResize() {
@@ -184,91 +158,63 @@ raycaster = new THREE.Raycaster(
   10
 );
 
-forwardRaycaster = new THREE.Raycaster(
-  new THREE.Vector3(),
-  new THREE.Vector3(0, 0, -1), // Изменен вектор направления для forwardRaycaster
-  2,
-  10
-);
-
-xRaycater = new THREE.Raycaster(
-  new THREE.Vector3(),
-  new THREE.Vector3(-1, 0, 0), // Изменен вектор направления для forwardRaycaster
-  2,
-  10
-);
-
-// mouseRaycaster = new THREE.Raycaster();
-// mouseRaycaster.setFromCamera(controls, camera);
-
 function animate() {
   requestAnimationFrame(animate);
-
-  const time = performance.now();
-
   if (controls.isLocked === true) {
     raycaster.ray.origin.copy(controls.getObject().position);
     raycaster.ray.origin.y -= 10;
-
-    const intersections = raycaster.intersectObjects(objects, false);
-
-    forwardRaycaster.ray.origin.copy(controls.getObject().position);
-    forwardRaycaster.ray.origin.z -= 10;
-    const forwardIntersections = forwardRaycaster.intersectObjects(
-      objects,
-      false
-    );
-
-    // const mouseIntersects = mouseRaycaster.intersectObjects(objects);
-    //console.log(mouseIntersects);
-
-    xRaycater.ray.origin.copy(controls.getObject().position);
-    xRaycater.ray.origin.x -= 10;
-    const xIntersection = xRaycater.intersectObjects(objects, false);
-
-    const onObject = intersections.length > 0;
-    const crossingObject =
-      forwardIntersections.length > 0 || xIntersection.length > 0;
-
-    // console.log(forwardIntersections, xIntersection);
-
-    const delta = (time - prevTime) / 1000;
-
+    raycaster.ray.origin.x -= 0;
+    var intersections = raycaster.intersectObjects(objects);
+    var onObject = intersections.length > 0;
+    var time = performance.now();
+    var delta = (time - prevTime) / 1000;
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
-
     velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
-
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize(); // this ensures consistent movements in all directions
+    if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+    if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
     if (onObject === true) {
       velocity.y = Math.max(0, velocity.y);
       canJump = true;
     }
-    if (crossingObject) {
-      velocity.x = Math.max(0, velocity.x);
-      velocity.z = Math.max(0, velocity.z);
+    ////EDIT
+    let collisionRange = 10; //if the mesh gets too close, the camera clips though the object...
+    let tempVelocity = velocity.clone().multiplyScalar(delta); //get the delta velocity
+    let nextPosition = controls.getObject().position.clone().add(tempVelocity);
+    let playerPosition = controls.getObject().position.clone().add(velocity);
+    let tooClose = false;
+    for (let i = 0; i < objects.length; i++) {
+      let object = objects[i];
+      let objectDirection = object.position
+        .clone()
+        .sub(playerPosition)
+        .normalize();
+      raycaster.set(nextPosition, objectDirection); //set the position and direction
+      let directionIntersects = raycaster.intersectObject(object);
+      if (
+        directionIntersects.length > 0 &&
+        directionIntersects[0].distance < collisionRange
+      ) {
+        //too close, stop player from moving in that direction...
+        tooClose = true;
+        break;
+      }
     }
-
-    direction.z = Number(moveForward) - Number(moveBackward);
-    direction.x = Number(moveRight) - Number(moveLeft);
-    direction.normalize();
-
-    if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-    if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
-
-    controls.moveRight(-velocity.x * delta);
-    controls.moveForward(-velocity.z * delta);
-
-    controls.getObject().position.y += velocity.y * delta;
-
+    if (tooClose == false) {
+      controls.moveRight(-velocity.x * delta);
+      controls.moveForward(-velocity.z * delta);
+      controls.getObject().position.y += velocity.y * delta; // new behavior
+    }
+    ////EDIT
     if (controls.getObject().position.y < 10) {
       velocity.y = 0;
-      controls.getObject().position.y = 10; // camera position
-
+      controls.getObject().position.y = 10;
       canJump = true;
     }
+    prevTime = time;
   }
-
-  prevTime = time;
-
   renderer.render(scene, camera);
 }
