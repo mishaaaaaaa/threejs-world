@@ -160,61 +160,75 @@ raycaster = new THREE.Raycaster(
 
 function animate() {
   requestAnimationFrame(animate);
-  if (controls.isLocked === true) {
-    raycaster.ray.origin.copy(controls.getObject().position);
-    raycaster.ray.origin.y -= 10;
-    raycaster.ray.origin.x -= 0;
-    var intersections = raycaster.intersectObjects(objects);
-    var onObject = intersections.length > 0;
-    var time = performance.now();
-    var delta = (time - prevTime) / 1000;
-    velocity.x -= velocity.x * 10.0 * delta;
-    velocity.z -= velocity.z * 10.0 * delta;
-    velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
-    direction.z = Number(moveForward) - Number(moveBackward);
-    direction.x = Number(moveRight) - Number(moveLeft);
-    direction.normalize(); // this ensures consistent movements in all directions
-    if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-    if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
-    if (onObject === true) {
-      velocity.y = Math.max(0, velocity.y);
-      canJump = true;
-    }
-    ////EDIT
-    let collisionRange = 10; //if the mesh gets too close, the camera clips though the object...
-    let tempVelocity = velocity.clone().multiplyScalar(delta); //get the delta velocity
-    let nextPosition = controls.getObject().position.clone().add(tempVelocity);
-    let playerPosition = controls.getObject().position.clone().add(velocity);
-    let tooClose = false;
-    for (let i = 0; i < objects.length; i++) {
-      let object = objects[i];
-      let objectDirection = object.position
-        .clone()
-        .sub(playerPosition)
-        .normalize();
-      raycaster.set(nextPosition, objectDirection); //set the position and direction
-      let directionIntersects = raycaster.intersectObject(object);
-      if (
-        directionIntersects.length > 0 &&
-        directionIntersects[0].distance < collisionRange
-      ) {
-        //too close, stop player from moving in that direction...
-        tooClose = true;
-        break;
-      }
-    }
-    if (tooClose == false) {
-      controls.moveRight(-velocity.x * delta);
-      controls.moveForward(-velocity.z * delta);
-      controls.getObject().position.y += velocity.y * delta; // new behavior
-    }
-    ////EDIT
-    if (controls.getObject().position.y < 10) {
-      velocity.y = 0;
-      controls.getObject().position.y = 10;
-      canJump = true;
-    }
-    prevTime = time;
+
+  if (!controls.isLocked) return;
+
+  const time = performance.now();
+  const delta = (time - prevTime) / 1000;
+
+  const cameraPosition = controls.getObject().position;
+  raycaster.ray.origin.copy(cameraPosition).add(new THREE.Vector3(0, -10, 0));
+
+  const intersections = raycaster.intersectObjects(objects);
+  const onObject = intersections.length > 0;
+
+  velocity.x -= velocity.x * 10.0 * delta;
+  velocity.z -= velocity.z * 10.0 * delta;
+  velocity.y -= 9.8 * 100.0 * delta;
+
+  direction.z = Number(moveForward) - Number(moveBackward);
+  direction.x = Number(moveRight) - Number(moveLeft);
+  direction.normalize();
+
+  if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+  if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+
+  if (onObject) {
+    velocity.y = Math.max(0, velocity.y);
+    canJump = true;
   }
+
+  const collisionRange = 10;
+  const tempVelocity = velocity.clone().multiplyScalar(delta);
+  const nextPosition = cameraPosition.clone().add(tempVelocity);
+
+  let tooClose = false;
+
+  for (let i = 0; i < objects.length; i++) {
+    const object = objects[i];
+    const objectDirection = object.position
+      .clone()
+      .sub(nextPosition)
+      .normalize();
+    raycaster.set(nextPosition, objectDirection);
+    const directionIntersects = raycaster.intersectObject(object);
+
+    if (
+      directionIntersects.length > 0 &&
+      directionIntersects[0].distance < collisionRange
+    ) {
+      tooClose = true;
+      const collisionDirection = object.position
+        .clone()
+        .sub(cameraPosition)
+        .normalize();
+      cameraPosition.add(collisionDirection.multiplyScalar(-0.1));
+      break;
+    }
+  }
+
+  if (!tooClose) {
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
+    cameraPosition.y += velocity.y * delta;
+  }
+
+  if (cameraPosition.y < 10) {
+    velocity.y = 0;
+    cameraPosition.y = 10;
+    canJump = true;
+  }
+
+  prevTime = time;
   renderer.render(scene, camera);
 }
